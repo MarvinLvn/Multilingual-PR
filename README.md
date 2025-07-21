@@ -176,34 +176,6 @@ For our experiments, we used models hosted on Hugging Face library, that are pre
 - HuBERT *Large*: [facebook/hubert-large-ls960-ft](https://huggingface.co/facebook/hubert-large-ls960-ft)
 
 
-
-## :family: Language Family
-
-<center>
-
-The language family tree can be found in the following figure. This gives insight on the genetic proximity of each language.
-
-<p align="center">
-  <img src="assets/img_readme/ASR_language%20family.png"/>
-</p>
-
-| Language | Family | Proximity with English |
-|----------|--------|------------------------|
-| Italian :it: | *Romance* | 47.8 |
-| Russian :ru: | *East Slavic* | 60.3 |
-| Dutch 🇳🇱 | *West Germanic* | 27.2 |
-| Swedish 🇸🇪 | *North Germanic* | 26.7 |
-| Turkish :tr: | *Turkic* | 92.0 |
-
-
-</center>
-<p align="center">
-  <em> Genetic proximity between languages studied and english computed  [here](http://www.elinguistics.net/Compare_Languages.aspx). [1, 30]: Highly related languages, [30, 50]: Related languages, [50, 70]: Remotely related languages, [70, 78]: Very remotely related languages, [78, 100]: No recognizable relationship. </em>
-</p>
-
-**English** is a part of the *West Germanic* family.\
-Source: https://github.com/espeak-ng/espeak-ng/blob/master/docs/languages.md and http://www.elinguistics.net/Compare_Languages.aspx
-
 ## :chart_with_upwards_trend: Main results
 
 dataset: Common Voice Corpus 6.1 : https://commonvoice.mozilla.org/fr/datasets 

@@ -1,4 +1,4 @@
-name: speech-project
+name: phorec
 channels:
   - pytorch
   - huggingface
@@ -234,7 +234,6 @@ dependencies:
     - dlinfo==1.2.1
     - isodate==0.6.1
     - phonemizer==3.0.1
-    - python-graphviz==0.19.1
     - rfc3986==1.5.0
     - segments==2.2.0
     - tabulate==0.8.9
@@ -242,4 +241,3 @@ dependencies:
     - transformers==4.16.0
     - uritemplate==4.1.1
     - wget==3.2
-prefix: /home/clement/anaconda3/envs/speech-project

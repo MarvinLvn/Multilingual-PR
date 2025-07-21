@@ -82,7 +82,7 @@ class DatasetParams:
     """
 
     # Hugging Face datasets parameters
-    dataset_name: str = "common_voice"  # https://huggingface.co/mozilla-foundation or https://huggingface.co/datasets/common_voice # dataset, use <Dataset>Eval for FT
+    dataset_name: str = "mozilla-foundation/common_voice_11_0"  # https://huggingface.co/mozilla-foundation or https://huggingface.co/datasets/common_voice # dataset, use <Dataset>Eval for FT
     use_auth_token: bool = False  # True if use mozilla-foundation datasets
     subset: str = (
         "sv-SE"  # chosen language (see https://huggingface.co/datasets/common_voice)
