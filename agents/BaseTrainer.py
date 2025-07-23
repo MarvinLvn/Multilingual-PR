@@ -137,7 +137,6 @@ class BaseTrainer:
 
         path_model = f"{self.config.wandb_entity}/{self.config.wandb_project}/{self.config.best_model_run}:top-1"
         best_model_path = get_artifact(path_model, type="model")
-
         trainer.test(self.pl_model, self.datamodule, ckpt_path=best_model_path)
 
         return

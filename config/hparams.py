@@ -19,7 +19,7 @@ class Hparams:
     """Hyperparameters of for the run"""
 
     # wandb
-    wandb_entity: str = "asr-project"  # name of the project
+    wandb_entity: str = "marvinlvn-massachusetts-institute-of-technology"  # name of the project
     debug: bool = (
         False  # test code before running, if testing, no checkpoints are written
     )
@@ -50,7 +50,7 @@ class Hparams:
     enable_progress_bar: bool = True
 
     # testing params
-    best_model_run: str = "WavLM_sv"
+    best_model_run: str = "WavLM_ru"
 
     # Early Stopping
     early_stopping: bool = True
@@ -81,19 +81,28 @@ class DatasetParams:
     ! The batch_size and number of crops should be defined here
     """
 
-    # Hugging Face datasets parameters
-    dataset_name: str = "mozilla-foundation/common_voice_11_0"  # https://huggingface.co/mozilla-foundation or https://huggingface.co/datasets/common_voice # dataset, use <Dataset>Eval for FT
-    use_auth_token: bool = False  # True if use mozilla-foundation datasets
-    subset: str = (
-        "sv-SE"  # chosen language (see https://huggingface.co/datasets/common_voice)
-    )
-    download_mode: str = "reuse_dataset_if_exists"
-    cache_dir: str = osp.join(os.getcwd(), "assets")
+    # TinyVox Dataset Parameters
+    dataset_path: str = "/scratch2/mlavechin/tinyvox/TinyVox"
+    use_vad: bool = False  # Use audio_with_vad folder instead of audio
+    custom_dataset: bool = False # Flag to use TinyVox instead of HuggingFace
+    debug_training: bool = False # If activated, will only load 1000 training samples
+    create_dataset: bool = True # If activated, will recreate the dataset even if it already exists
 
-    # to create vocabulary of phonemes
+    # Hugging Face datasets parameters
+    # dataset_name: str = "mozilla-foundation/common_voice_11_0"  # https://huggingface.co/mozilla-foundation or https://huggingface.co/datasets/common_voice # dataset, use <Dataset>Eval for FT
+    # use_auth_token: bool = False  # True if use mozilla-foundation datasets
+    # subset: str = (
+    #     "sv-SE"  # chosen language (see https://huggingface.co/datasets/common_voice)
+    # )
+    # download_mode: str = "reuse_dataset_if_exists"
+    # cache_dir: str = osp.join(os.getcwd(), "assets")
+    # create_dataset: bool = False
+    #
+    # # to create vocabulary of phonemes
+
+    # root_path_annotation: str = osp.join(os.getcwd(), "assets", "common_voices_splits")
+    # phoible_csv_path: str = osp.join(os.getcwd(), "assets")
     language: str = "sv"
-    root_path_annotation: str = osp.join(os.getcwd(), "assets", "common_voices_splits")
-    phoible_csv_path: str = osp.join(os.getcwd(), "assets")
 
     # Dataloader parameters
     num_workers: int = 20  # number of workers for dataloaders
@@ -103,7 +112,6 @@ class DatasetParams:
     max_input_length_in_sec: float = 5
     num_proc: int = 4
 
-    create_dataset: bool = False
 
 
 @dataclass

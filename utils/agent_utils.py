@@ -43,7 +43,12 @@ def get_datamodule(data_param):
     """
     Fetch Datamodule Function Pointer
     """
-    return BaseDataModule(data_param)
+    if getattr(data_param, 'custom_dataset', False):
+        from Datasets.tinyvox_datamodule import TinyVoxDataModule
+        return TinyVoxDataModule(data_param)
+    else:
+        from Datasets.datamodule import BaseDataModule
+        return BaseDataModule(data_param)
 
 
 def get_model(model_name, params):

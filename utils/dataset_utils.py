@@ -18,9 +18,9 @@ def coll_fn(batch):
         [torch.Tensor(b["audio"]) for b in batch], padding_value=0, batch_first=True
     )
     batch_dict["path"] = [b["path"] for b in batch]
-    batch_dict["sentence"] = [b["sentence"] for b in batch]
     batch_dict["phonemes"] = [b["phonemes"] for b in batch]
-
+    if "sentence" in batch[0]:
+        batch_dict["sentence"] = [b["sentence"] for b in batch]
     return batch_dict
 
 

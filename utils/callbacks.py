@@ -161,12 +161,20 @@ class AutoSaveModelCheckpoint(ModelCheckpoint):
             return
 
     def on_exception(
-        self,
-        trainer: "pl.Trainer",
-        pl_module: "pl.LightningModule",
-        exception: BaseException,
+            self,
+            trainer: "pl.Trainer",
+            pl_module: "pl.LightningModule",
+            exception: BaseException,
     ) -> None:
-        self.log_artifact()
+        try:
+            # Only log artifact if we have the required attributes
+            if hasattr(self, 'name') and hasattr(self, 'filepath'):
+                self.log_artifact()
+            else:
+                print("Skipping artifact logging - missing required attributes")
+        except Exception as callback_error:
+            print(f"Warning: Could not log artifact on exception: {callback_error}")
+
         return super().on_exception(trainer, pl_module, exception)
 
     def on_train_end(

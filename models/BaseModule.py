@@ -43,7 +43,7 @@ class BaseModule(LightningModule):
             pad_token=network_param.pad_token,
             word_delimiter_token=network_param.word_delimiter_token,
             do_phonemize=False,
-            return_attention_mask=False,
+            #return_attention_mask=False,
         )
 
         network_param.vocab_size = self.phonemes_tokenizer.vocab_size
