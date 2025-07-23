@@ -83,6 +83,7 @@ class DatasetParams:
 
     # TinyVox Dataset Parameters
     dataset_path: str = "/scratch2/mlavechin/tinyvox/TinyVox"
+    inventory_path: str= "/scratch2/mlavechin/tinyvox/TinyVox/unique_phonemes.json"
     use_vad: bool = False  # Use audio_with_vad folder instead of audio
     custom_dataset: bool = False # Flag to use TinyVox instead of HuggingFace
     debug_training: bool = False # If activated, will only load 1000 training samples

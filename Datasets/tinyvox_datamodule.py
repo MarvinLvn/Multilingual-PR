@@ -29,31 +29,16 @@ class TinyVoxDataModule(LightningDataModule):
 
         self.logger.info(f'Loading Dataset : {self.config.dataset_path / self.audio_folder}')
 
-
-    def setup(self, stage=None):
-        """ Load and setup datasets """
-        if stage in (None, 'fit'):
-            self.train_dataset = self._load_split('train')
-            self.val_dataset = self._load_split('val')
-            self._process_split('train')
-            self._process_split('val')
-
-        if stage == 'test':
-            self.test_dataset = self._load_split('test')
-            self._process_split('test')
-
     def _load_split(self, split):
         """Load a dataset split from CSV and audio files"""
         save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
-        processed_file = save_path / f'tinyvox_{split}_processed.pkl'
+        save_file = save_path / f'tinyvox_{split}.pkl'
 
         # A. Load pickle file if it exists (if create_dataset = False)
-        if processed_file.is_file() and not self.config.create_dataset:
-            self.logger.info(f"Loading cached {split} dataset from {processed_file}")
-            with open(processed_file, 'rb') as f:
+        if save_file.is_file() and not self.config.create_dataset:
+            self.logger.info(f"Loading cached {split} dataset from {save_file}")
+            with open(save_file, 'rb') as f:
                 return pickle.load(f)
-
-        save_path.mkdir(exist_ok=True, parents=True)
 
         csv_path = self.config.dataset_path / f'{split}.csv'
         audio_dir = self.config.dataset_path / self.audio_folder
@@ -75,7 +60,7 @@ class TinyVoxDataModule(LightningDataModule):
         df = df[~na_phones]
 
         # B.2 Verify required columns
-        required_cols = ['audio_filename', 'phones']
+        required_cols = ['audio_filename', 'phones', 'sentence']
         missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise ValueError(f"Missing required columns in CSV: {missing_cols}")
@@ -100,52 +85,79 @@ class TinyVoxDataModule(LightningDataModule):
             'audio': df['full_audio_path'].tolist(),
             'path': df['full_audio_path'].tolist(),
             'phonemes': df['phones'].tolist(),
+            'sentence': df['sentence'].tolist()
         }
 
         dataset = Dataset.from_dict(dataset_dict)
         dataset = dataset.cast_column("audio", Audio(sampling_rate=self.sampling_rate))
-        dataset = dataset.map( self._extract_audio_array, num_proc=self.config.num_proc, load_from_cache_file=False)
 
         # C. Save dataset
-        self.logger.info(f"Saving processed {split} dataset to {processed_file}")
-        with open(processed_file, 'wb') as f:
+        self.logger.info(f"Saving processed {split} dataset to {save_file}")
+        save_path.mkdir(exist_ok=True, parents=True)
+        with open(save_file, 'wb') as f:
             pickle.dump(dataset, f)
 
         return dataset
 
-    def _extract_audio_array(self, sample):
-        """Extract audio array from HuggingFace Audio format"""
-        return {
-            'audio': sample['audio']['array'],  # Extract just the numpy array
-            'path': sample['path'],
-            'phonemes': sample['phonemes'],
-        }
 
-    def _process_split(self, split):
+    def _process_split(self, split, processor, batch_size=512):
         """Process dataset split - format phonemes"""
         dataset = getattr(self, f"{split}_dataset")
 
-        # Format phonemes to match expected format
-        dataset = dataset.map(
-            self._format_phonemes,
-            num_proc=self.config.num_proc,
-            load_from_cache_file=False,
-        )
+        save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
+        save_file = save_path / f'tinyvox_{split}_processed.pkl'
+
+        # A. Load pickle file if it exists (if create_dataset = False)
+        if save_file.is_file() and not self.config.create_dataset:
+            self.logger.info(f"Loading cached {split} dataset from {save_file}")
+            with open(save_file, 'rb') as f:
+                dataset = pickle.load(f)
+        else:
+            # B.1 Remove punctuation (for purely aesthetic purpose to log info in wandb)
+            dataset = dataset.map(
+                lambda x: {
+                    'sentence': re.sub(
+                        CHARS_TO_REMOVE_REGEX, '', x['sentence']
+                    ).lower()
+                },
+                num_proc=self.config.num_proc,
+                load_from_cache_file=False
+            )
+
+            # B.2 Apply processor
+            dataset = dataset.map(
+                lambda batch: {
+                    'audio': processor(
+                        [ad['array'] for ad in batch['audio']], sampling_rate=16000
+                ).input_values
+                },
+                batched=True,
+                batch_size=batch_size,
+                num_proc=self.config.num_proc,
+                load_from_cache_file=False
+            )
+
+            # C. Save dataset
+            self.logger.info(f"Saving processed {split} dataset to {save_file}")
+            with open(save_file, 'wb') as f:
+                pickle.dump(dataset, f)
 
         setattr(self, f"{split}_dataset", dataset)
         self.logger.info(f"Processed {split} dataset: {len(dataset)} samples")
 
-    def _format_phonemes(self, data_sample):
-        """Add space between individual phonemes and | for end of word token"""
-        """ meʒərɪŋ kʌp -->  m e ʒ ə r ɪ ŋ | k ʌ p |"""
-        raw_phones = data_sample['phonemes'].strip()
 
-        # Convert "meʒərɪŋ kʌp" → "m e ʒ ə r ɪ ŋ | k ʌ p |"
-        formatted_phones = ' | '.join(
-            ' '.join(word) for word in raw_phones.split()
-        ) + ' |'
-
-        return {'phonemes': formatted_phones}
+    def setup(self, stage, processor):
+        """ Load and setup datasets """
+        if stage == 'fit':
+            self.train_dataset = self._load_split('train')
+            self.val_dataset = self._load_split('val')
+            self._process_split('train', processor)
+            self._process_split('val', processor)
+        elif stage == 'test':
+            self.test_dataset = self._load_split('test')
+            self._process_split('test', processor)
+        else:
+            raise ValueError(f"Unknown stage: {stage}")
 
     def train_dataloader(self):
         return DataLoader(

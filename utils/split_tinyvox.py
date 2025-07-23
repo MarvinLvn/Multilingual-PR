@@ -66,10 +66,17 @@ def main():
     val_duration = (val_df['offset'] - val_df['onset']).sum() / 3600000
     test_duration = (test_df['offset'] - test_df['onset']).sum() / 3600000
 
+    # Count unique children
+    total_children = metadata['child_pseudoid'].nunique()
+    train_children_count = len(train_children)
+    val_children_count = len(val_children)
+    test_children_count = len(test_children)
+
     # Print actual proportions achieved
     print(f"Target proportions - Val: {args.val_prop:.1%}, Test: {args.test_prop:.1%}")
     print(f"Actual proportions - Val: {len(val_df) / total_rows:.1%}, Test: {len(test_df) / total_rows:.1%}")
     print(f"Rows - Train: {len(train_df)}, Val: {len(val_df)}, Test: {len(test_df)}")
+    print(f"Children - Train: {train_children_count}, Val: {val_children_count}, Test: {test_children_count}, Total: {total_children}")
 
     print(f"Duration (hours) - Train: {train_duration:.1f}, Val: {val_duration:.1f}, Test: {test_duration:.1f}")
     print(f"Duration proportions - Val: {val_duration / total_duration:.1%}, Test: {test_duration / total_duration:.1%}")

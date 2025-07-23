@@ -15,7 +15,7 @@ from utils.callbacks import (
 )
 from utils.logger import init_logger
 
-from utils.dataset_utils import create_vocabulary, create_vocabulary2
+from utils.dataset_utils import create_vocabulary, create_vocabulary2, create_tinyvox_vocabulary
 
 
 class BaseTrainer:
@@ -26,11 +26,27 @@ class BaseTrainer:
 
         self.logger = init_logger("BaseTrainer", "INFO")
 
-        self.logger.info(
-            f"Create vocabulary language : {config.data_param.language} ..."
-        )
 
-        if config.data_param.subset == "en":
+        if config.data_param.custom_dataset:
+            self.logger.info(
+                f"Create vocabulary language for TinyVox ..."
+            )
+            (
+                config.network_param.vocab_file,
+                config.network_param.len_vocab,
+            ) = create_tinyvox_vocabulary(
+                config.data_param.inventory_path,
+                eos_token=config.network_param.eos_token,
+                bos_token=config.network_param.bos_token,
+                unk_token=config.network_param.unk_token,
+                pad_token=config.network_param.pad_token,
+                word_delimiter_token=config.network_param.word_delimiter_token
+            )
+
+        elif config.data_param.subset == "en":
+            self.logger.info(
+                f"Create vocabulary language : {config.data_param.language} ..."
+            )
             (
                 config.network_param.vocab_file,
                 config.network_param.len_vocab,
@@ -44,6 +60,9 @@ class BaseTrainer:
                 word_delimiter_token=config.network_param.word_delimiter_token,
             )
         else:
+            self.logger.info(
+                f"Create vocabulary language : {config.data_param.language} ..."
+            )
             (
                 config.network_param.vocab_file,
                 config.network_param.len_vocab,
@@ -65,7 +84,8 @@ class BaseTrainer:
         self.logger.info("Loading Model module...")
         self.pl_model = BaseModule(config.network_param, config.optim_param)
 
-        self.wb_run.watch(self.pl_model.model)
+        if self.wb_run is not None:
+            self.wb_run.watch(self.pl_model.model)
 
     def run(self):
         if self.config.tune_lr:
@@ -101,11 +121,14 @@ class BaseTrainer:
 
         trainer.logger = self.wb_run
 
-        self.datamodule.load_data("train")
-        self.datamodule.process_dataset("train", self.pl_model.processor)
+        if self.config.data_param.custom_dataset:
+            self.datamodule.setup('fit', self.pl_model.processor)
+        else:
+            self.datamodule.load_data("train")
+            self.datamodule.process_dataset("train", self.pl_model.processor)
 
-        self.datamodule.load_data("val")
-        self.datamodule.process_dataset("val", self.pl_model.processor)
+            self.datamodule.load_data("val")
+            self.datamodule.process_dataset("val", self.pl_model.processor)
 
         if self.config.tune_lr:
             tune_lr_trainer.tune(self.pl_model, datamodule=self.datamodule)
