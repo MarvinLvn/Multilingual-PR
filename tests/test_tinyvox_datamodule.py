@@ -2,6 +2,8 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from config.hparams import Parameters
+from models.BaseModule import BaseModule
+from agents.BaseTrainer import BaseTrainer
 
 
 def test_tinyvox():
@@ -15,24 +17,26 @@ def test_tinyvox():
         '--language', 'en',
         '--batch_size', '64',
         '--num_proc', '8',
+        '--create_dataset', 'True',
+        '--debug_training', 'False',
     ]
 
     parameters = Parameters.parse()
 
-    # Test datamodule
-    from utils.agent_utils import get_datamodule
-    datamodule = get_datamodule(parameters.data_param)
 
     # Setup and test
-    datamodule.setup("fit")
+    agent = BaseTrainer(parameters, run=None)
+    pl_model = agent.pl_model
+    agent.datamodule.setup("fit", pl_model.processor)
 
-    train_loader = datamodule.train_dataloader()
+    train_loader = agent.datamodule.train_dataloader()
     first_batch = next(iter(train_loader))
 
     print("✅ TinyVox dataset works!")
     print(f"Batch keys: {first_batch.keys()}")
     print(f"Audio shape: {first_batch['array'].shape}")
     print(f"First phonemes: {first_batch['phonemes'][0]}")
+    print(f"First sentence: {first_batch['sentence'][0]}")
 
 
 if __name__ == "__main__":

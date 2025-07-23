@@ -32,13 +32,12 @@ class TinyVoxDataModule(LightningDataModule):
     def _load_split(self, split):
         """Load a dataset split from CSV and audio files"""
         save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
-        save_file = save_path / f'tinyvox_{split}.pkl'
+        save_dir = save_path / f'tinyvox_{split}_raw'
 
         # A. Load pickle file if it exists (if create_dataset = False)
-        if save_file.is_file() and not self.config.create_dataset:
-            self.logger.info(f"Loading cached {split} dataset from {save_file}")
-            with open(save_file, 'rb') as f:
-                return pickle.load(f)
+        if save_dir.exists() and not self.config.create_dataset:
+            self.logger.info(f"Loading cached {split} dataset from {save_dir}")
+            return Dataset.load_from_disk(str(save_dir))
 
         csv_path = self.config.dataset_path / f'{split}.csv'
         audio_dir = self.config.dataset_path / self.audio_folder
@@ -92,10 +91,9 @@ class TinyVoxDataModule(LightningDataModule):
         dataset = dataset.cast_column("audio", Audio(sampling_rate=self.sampling_rate))
 
         # C. Save dataset
-        self.logger.info(f"Saving processed {split} dataset to {save_file}")
+        self.logger.info(f"Saving processed {split} dataset to {save_dir}")
         save_path.mkdir(exist_ok=True, parents=True)
-        with open(save_file, 'wb') as f:
-            pickle.dump(dataset, f)
+        dataset.save_to_disk(str(save_dir))
 
         return dataset
 
@@ -105,13 +103,12 @@ class TinyVoxDataModule(LightningDataModule):
         dataset = getattr(self, f"{split}_dataset")
 
         save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
-        save_file = save_path / f'tinyvox_{split}_processed.pkl'
+        save_dir = save_path / f'tinyvox_{split}_processed'
 
         # A. Load pickle file if it exists (if create_dataset = False)
-        if save_file.is_file() and not self.config.create_dataset:
-            self.logger.info(f"Loading cached {split} dataset from {save_file}")
-            with open(save_file, 'rb') as f:
-                dataset = pickle.load(f)
+        if save_dir.exists() and not self.config.create_dataset:
+            self.logger.info(f"Loading cached {split} dataset from {save_dir}")
+            dataset = Dataset.load_from_disk(str(save_dir))
         else:
             # B.1 Remove punctuation (for purely aesthetic purpose to log info in wandb)
             dataset = dataset.map(
@@ -138,9 +135,8 @@ class TinyVoxDataModule(LightningDataModule):
             )
 
             # C. Save dataset
-            self.logger.info(f"Saving processed {split} dataset to {save_file}")
-            with open(save_file, 'wb') as f:
-                pickle.dump(dataset, f)
+            self.logger.info(f"Saving processed {split} dataset to {save_dir}")
+            dataset.save_to_disk(str(save_dir))
 
         setattr(self, f"{split}_dataset", dataset)
         self.logger.info(f"Processed {split} dataset: {len(dataset)} samples")

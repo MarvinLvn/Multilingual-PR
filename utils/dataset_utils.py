@@ -8,11 +8,11 @@ import torch
 import wget
 from torch.nn.utils.rnn import pad_sequence
 
+import json
 from utils.logger import init_logger
 
 
 def coll_fn(batch):
-
     batch_dict = {}
     batch_dict["array"] = pad_sequence(
         [torch.Tensor(b["audio"]) for b in batch], padding_value=0, batch_first=True
@@ -23,6 +23,29 @@ def coll_fn(batch):
         batch_dict["sentence"] = [b["sentence"] for b in batch]
     return batch_dict
 
+def create_tinyvox_vocabulary(path_inventory, eos_token, bos_token, unk_token, pad_token, word_delimiter_token):
+    logger = init_logger("create_tinyvox_vocabulary", "INFO")
+
+    phonemes = sorted(json.load(open(path_inventory, 'r')))
+    phoneme_vocab = {phonemes[i]: i for i in range(len(phonemes))}
+    phoneme_vocab[eos_token] = len(phoneme_vocab)
+    phoneme_vocab[bos_token] = len(phoneme_vocab)
+    phoneme_vocab[unk_token] = len(phoneme_vocab)
+    phoneme_vocab[pad_token] = len(phoneme_vocab)
+    phoneme_vocab[word_delimiter_token] = len(phoneme_vocab)
+
+    logger.info(f"Length vocabulary : {len(phoneme_vocab)}")
+
+    vocab_path = osp.join(os.getcwd(), "assets", "vocab_phoneme")
+    file_dict = os.path.join(vocab_path, f"vocab-phoneme-tinyvox.json")
+
+    if not os.path.exists(vocab_path):
+        os.makedirs(vocab_path)
+
+    with open(file_dict, "w") as vocab_file:
+        json.dump(phoneme_vocab, vocab_file)
+
+    return file_dict, len(phoneme_vocab)
 
 def create_vocabulary(
     ISO6393, path_csv, eos_token, bos_token, unk_token, pad_token, word_delimiter_token
