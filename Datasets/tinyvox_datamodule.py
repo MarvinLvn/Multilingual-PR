@@ -108,7 +108,7 @@ class TinyVoxDataModule(LightningDataModule):
         # A. Load pickle file if it exists (if create_dataset = False)
         if save_dir.exists() and not self.config.create_dataset:
             self.logger.info(f"Loading cached {split} dataset from {save_dir}")
-            dataset = Dataset.load_from_disk(str(save_dir))
+            dataset = Dataset.load_from_disk(str(save_dir), keep_in_memory=False)
         else:
             # B.1 Remove punctuation (for purely aesthetic purpose to log info in wandb)
             dataset = dataset.map(
@@ -131,6 +131,7 @@ class TinyVoxDataModule(LightningDataModule):
                 batched=True,
                 batch_size=batch_size,
                 num_proc=self.config.num_proc,
+                cache_file_name=str(save_path / f'audio_processed.arrow'), # add cache in the file_name
                 load_from_cache_file=False
             )
 

@@ -50,7 +50,7 @@ dependencies:
   - cudatoolkit=10.2.89=hfd86e86_1
   - cycler=0.11.0=pyhd8ed1ab_0
   - dataclasses=0.8=pyh6d0b6a4_7
-  - datasets=1.18.3=py_0
+  - datasets=3.1.0
   - decorator=5.1.1=pyhd8ed1ab_0
   - dill=0.3.4=pyhd3eb1b0_0
   - docker-pycreds=0.4.0=pyhd3eb1b0_0
@@ -59,7 +59,7 @@ dependencies:
   - fonttools=4.29.1=py38h497a2fe_0
   - freetype=2.11.0=h70c0345_0
   - frozenlist=1.2.0=py38h7f8727e_0
-  - fsspec=2022.1.0=pyhd3eb1b0_0
+  - fsspec=2024.9.0
   - future=0.18.2=py38_1
   - gettext=0.21.0=hf68c758_0
   - gflags=2.2.2=he6710b0_0
@@ -158,7 +158,7 @@ dependencies:
   - promise=2.3=py38h06a4308_0
   - protobuf=3.19.1=py38h295c915_0
   - psutil=5.8.0=py38h27cfd23_1
-  - pyarrow=6.0.1=py38he7e5f7d_5_cpu
+  - pyarrow=17.0.0
   - pyasn1=0.4.8=pyhd3eb1b0_0
   - pyasn1-modules=0.2.8=py_0
   - pycparser=2.21=pyhd3eb1b0_0
@@ -209,7 +209,7 @@ dependencies:
   - torchaudio=0.10.2=py38_cu102
   - torchmetrics=0.7.2=pyhd8ed1ab_0
   - torchvision=0.11.3=py38_cu102
-  - tqdm=4.62.3=pyhd3eb1b0_1
+  - tqdm=4.67.1
   - typing-extensions=3.10.0.2=hd3eb1b0_0
   - typing_extensions=3.10.0.2=pyh06a4308_0
   - typing_inspect=0.7.1=pyhd3eb1b0_0
