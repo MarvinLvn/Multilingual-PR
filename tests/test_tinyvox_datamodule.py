@@ -11,7 +11,7 @@ def test_tinyvox():
     sys.argv = [
         'test',
         '--custom_dataset', 'True',
-        '--use_vad', 'False',
+        '--use_vad', 'True',
         '--dataset_path', '/scratch2/mlavechin/tinyvox/TinyVox',
         '--language', 'en',
         '--batch_size', '64',

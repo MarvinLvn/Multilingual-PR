@@ -31,8 +31,8 @@ class TinyVoxDataModule(LightningDataModule):
 
     def _load_split(self, split):
         """Load a dataset split from CSV and audio files"""
-        save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
-        save_dir = save_path / f'tinyvox_{split}_raw'
+        save_path = Path('assets') / 'datasets' / f'tinyvox_{self.audio_folder}' / split
+        save_dir = save_path / 'raw'
 
         # A. Load pickle file if it exists (if create_dataset = False)
         if save_dir.exists() and not self.config.create_dataset:
@@ -102,8 +102,8 @@ class TinyVoxDataModule(LightningDataModule):
         """Process dataset split - format phonemes"""
         dataset = getattr(self, f"{split}_dataset")
 
-        save_path = Path('assets') / 'datasets' / f'{split}_tinyvox'
-        save_dir = save_path / f'tinyvox_{split}_processed'
+        save_path = Path('assets') / 'datasets' / f'tinyvox_{self.audio_folder}' / split
+        save_dir = save_path / 'processed'
 
         # A. Load pickle file if it exists (if create_dataset = False)
         if save_dir.exists() and not self.config.create_dataset:
@@ -131,7 +131,7 @@ class TinyVoxDataModule(LightningDataModule):
                 batched=True,
                 batch_size=batch_size,
                 num_proc=self.config.num_proc,
-                cache_file_name=str(save_path / f'audio_processed.arrow'), # add cache in the file_name
+                cache_file_name=str(save_path / f'dataset_cache.arrow'),
                 load_from_cache_file=False
             )
 
