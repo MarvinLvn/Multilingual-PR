@@ -1,14 +1,16 @@
 import re
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import soundfile as sf
-from datasets import Dataset
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
-
 from utils.constant import CHARS_TO_REMOVE_REGEX
 from utils.logger import init_logger
+
+from datasets import Dataset
+
 
 class ContextualTinyVoxDataModule(LightningDataModule):
     def __init__(self, dataset_param):
@@ -18,6 +20,8 @@ class ContextualTinyVoxDataModule(LightningDataModule):
 
         # Context parameters
         self.context_duration = dataset_param.context_duration
+        if self.context_duration is None or self.context_duration < 0:
+            raise ValueError("context_duration must be a non-negative number")
         self.context_duration_ms = self.context_duration * 1000
 
         self.sampling_rate = 16000
@@ -41,8 +45,17 @@ class ContextualTinyVoxDataModule(LightningDataModule):
         if self.config.debug_dataset:
             df = df.iloc[:min(len(df), self.n_debug)]
 
-        # Retrieve original filename
-        df['original_filename'] = df['audio_filename'].map(lambda x: '_'.join(x.split('_')[:-2]) + '.wav')
+        # Original recordings are not needed in no-context mode. Apart from
+        # saving disk space, delaying this conversion keeps audio-only datasets
+        # independent of the naming convention used by original recordings.
+        if self.context_duration == 0:
+            audio_dir = self.config.dataset_path / 'audio'
+            if not audio_dir.is_dir():
+                raise FileNotFoundError(f"TinyVox audio directory not found: {audio_dir}")
+        else:
+            df['original_filename'] = df['audio_filename'].map(
+                lambda filename: '_'.join(filename.split('_')[:-2]) + '.wav'
+            )
 
         self.logger.info(f"Loaded {len(df)} utterances for {split} split")
 
@@ -64,25 +77,58 @@ class ContextualTinyVoxDataModule(LightningDataModule):
         return dataset
 
     def _create_contextual_metadata(self, df):
-        """Create contextual training sample metadata from utterance metadata"""
-        contextual_samples = []
+        """Create training sample metadata.
 
-        # Group by original audio file
+        With context_duration == 0, use the already-segmented TinyVox WAV files
+        from audio/ directly.
+
+        With context_duration > 0, preserve the original BabAR contextual
+        behaviour based on original/ recordings.
+        """
+        samples = []
+
+        # No-context mode: TinyVox utterance WAVs are already segmented.
+        if self.context_duration == 0:
+            for _, row in df.iterrows():
+                audio_path = self.config.dataset_path / 'audio' / row['audio_filename']
+
+                phonemes = row['phones'].strip() if pd.notna(row['phones']) else ""
+                sentence = row['sentence'] if pd.notna(row['sentence']) else ""
+                cleaned_sentence = re.sub(
+                    CHARS_TO_REMOVE_REGEX, '', sentence
+                ).lower().strip()
+
+                samples.append({
+                    'audio_path': str(audio_path),
+                    'target_phonemes': phonemes,
+                    'target_sentence': cleaned_sentence,
+                    'audio_filename': row['audio_filename'],
+                })
+
+            return samples
+
+        # Contextual mode: preserve the original implementation.
         grouped = df.groupby('original_filename')
 
         for original_filename, group in grouped:
-            original_audio_path = self.config.dataset_path / 'original' / original_filename
+            original_audio_path = (
+                self.config.dataset_path
+                / 'original'
+                / original_filename
+            )
 
-            # Sort utterances by onset time
             group = group.sort_values('onset')
 
-            # Create contextual sample for each utterance
-            for idx, row in group.iterrows():
-                sample = self._create_context_metadata_for_utterance(row, str(original_audio_path))
-                if sample:
-                    contextual_samples.append(sample)
+            for _, row in group.iterrows():
+                sample = self._create_context_metadata_for_utterance(
+                    row,
+                    str(original_audio_path)
+                )
 
-        return contextual_samples
+                if sample:
+                    samples.append(sample)
+
+        return samples
 
     def _create_context_metadata_for_utterance(self, target_row, original_audio_path):
         """Create metadata for a contextual sample centered around a target utterance"""
@@ -180,27 +226,113 @@ class ContextualTinyVoxDataModule(LightningDataModule):
 
         return audio
 
+    def _load_audio_file(self, audio_path):
+        """Load an entire already-segmented TinyVox WAV file."""
+        audio, sr = sf.read(audio_path, dtype='float32')
+
+        if audio.ndim > 1:
+            audio = audio.mean(axis=1)
+
+        if sr != self.sampling_rate:
+            raise ValueError(
+                f"Sample rate mismatch in {audio_path}: "
+                f"expected {self.sampling_rate}, got {sr}"
+            )
+
+        return audio
+
     def collate_fn(self, batch):
-        """Load audio on-demand and create batch"""
+        """Load audio on-demand and create batch."""
+
         context_audios = []
         valid_samples = []
 
-        # First pass: determine the maximum duration needed across the batch
-        max_duration_ms = max(sample['context_duration_ms'] for sample in batch)
-        expected_length = int(self.sampling_rate * max_duration_ms / 1000.0)
+        # TinyVox audio/*.wav already contains the target utterance.
+        if self.context_duration == 0:
+            for sample in batch:
+                audio = self._load_audio_file(sample['audio_path'])
 
-        # Second pass: load and pad all audio to the same length
+                context_audios.append(audio)
+                valid_samples.append(sample)
+
+            if not context_audios:
+                raise ValueError("No valid audio samples in batch")
+
+            # Dynamic padding is performed by the processor.
+            processed = self.processor(
+                context_audios,
+                sampling_rate=self.sampling_rate,
+                padding=True,
+                return_tensors="pt",
+            )
+
+            # In no-context mode, the whole WAV corresponds to the target.
+            target_frame_starts = [0] * len(context_audios)
+
+            target_frame_ends = [
+                max(
+                    1,
+                    round(len(audio) * 50.0 / self.sampling_rate)
+                )
+                for audio in context_audios
+            ]
+
+            target_start_ms = [0.0] * len(context_audios)
+
+            target_end_ms = [
+                len(audio) * 1000.0 / self.sampling_rate
+                for audio in context_audios
+            ]
+
+            cleaned_sentences = [
+                sample.get('target_sentence', '')
+                for sample in valid_samples
+            ]
+
+            return {
+                "array": processed["input_values"],
+                "path": [
+                    sample["audio_path"]
+                    for sample in valid_samples
+                ],
+                "phonemes": [
+                    sample["target_phonemes"]
+                    for sample in valid_samples
+                ],
+                "sentence": cleaned_sentences,
+                "target_frame_start": target_frame_starts,
+                "target_frame_end": target_frame_ends,
+                "target_start_ms": target_start_ms,
+                "target_end_ms": target_end_ms,
+                "audio_filename": [
+                    sample["audio_filename"]
+                    for sample in valid_samples
+                ],
+            }
+
+        max_duration_ms = max(
+            sample['context_duration_ms']
+            for sample in batch
+        )
+
+        expected_length = int(
+            self.sampling_rate * max_duration_ms / 1000.0
+        )
+
         for sample in batch:
-            # Load the context audio segment - will raise exception if fails
             audio = self._load_audio_segment(
                 sample['original_audio_path'],
                 sample['context_start_ms'],
                 sample['context_duration_ms']
             )
 
-            # Pad all samples to the maximum length in this batch
             if len(audio) < expected_length:
-                audio = np.pad(audio, (0, expected_length - len(audio)), mode='constant', constant_values=0.0)
+                audio = np.pad(
+                    audio,
+                    (0, expected_length - len(audio)),
+                    mode='constant',
+                    constant_values=0.0
+                )
 
             context_audios.append(audio)
             valid_samples.append(sample)
@@ -208,7 +340,6 @@ class ContextualTinyVoxDataModule(LightningDataModule):
         if not context_audios:
             raise ValueError("No valid audio samples in batch")
 
-        # Process without attention masks
         processed = self.processor(
             context_audios,
             sampling_rate=self.sampling_rate,
@@ -216,26 +347,47 @@ class ContextualTinyVoxDataModule(LightningDataModule):
             return_tensors="pt",
         )
 
-        # Extract precomputed frame boundaries
-        target_frame_starts = [sample["target_start_frame"] for sample in valid_samples]
-        target_frame_ends = [sample["target_end_frame"] for sample in valid_samples]
+        target_frame_starts = [
+            sample["target_start_frame"]
+            for sample in valid_samples
+        ]
 
-        # Use pre-cleaned sentences
-        cleaned_sentences = [sample.get('target_sentence', '') for sample in valid_samples]
+        target_frame_ends = [
+            sample["target_end_frame"]
+            for sample in valid_samples
+        ]
 
-        result = {
+        cleaned_sentences = [
+            sample.get('target_sentence', '')
+            for sample in valid_samples
+        ]
+
+        return {
             "array": processed["input_values"],
-            "path": [sample["original_audio_path"] for sample in valid_samples],
-            "phonemes": [sample["target_phonemes"] for sample in valid_samples],
+            "path": [
+                sample["original_audio_path"]
+                for sample in valid_samples
+            ],
+            "phonemes": [
+                sample["target_phonemes"]
+                for sample in valid_samples
+            ],
             "sentence": cleaned_sentences,
             "target_frame_start": target_frame_starts,
             "target_frame_end": target_frame_ends,
-            "target_start_ms": [sample["target_start_ms"] for sample in valid_samples],
-            "target_end_ms": [sample["target_end_ms"] for sample in valid_samples],
-            "audio_filename": [sample["audio_filename"] for sample in valid_samples],
+            "target_start_ms": [
+                sample["target_start_ms"]
+                for sample in valid_samples
+            ],
+            "target_end_ms": [
+                sample["target_end_ms"]
+                for sample in valid_samples
+            ],
+            "audio_filename": [
+                sample["audio_filename"]
+                for sample in valid_samples
+            ],
         }
-
-        return result
 
     def train_dataloader(self):
         return DataLoader(

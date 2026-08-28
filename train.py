@@ -15,6 +15,9 @@ from utils.agent_utils import parse_params, get_run_name
 def main():
     parameters = Parameters.parse()
 
+    # Fail before creating a W&B run if local data configuration is invalid.
+    parameters.data_param.validate_paths()
+
     # initialize wandb instance
     wdb_config = parse_params(parameters)
     run_name = get_run_name(parameters)

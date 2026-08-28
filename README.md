@@ -22,6 +22,12 @@ pip install -r requirements.txt
 
 ## Data preparation 
 
+Create the phoneme inventory expected by the tokenizer:
+
+```shell
+python utils/create_phoneme_inventory.py ../tinyvox/TinyVox
+```
+
 If you want to resplit TinyVox into train/dev/test sets:
 
 ```shell
@@ -36,7 +42,7 @@ The code expects TinyVox to have the following structure:
 
 ```
 ├── audio/
-├── original/
+├── original/  # only required when context_duration > 0
 ├── metadata.csv
 ├── train.csv
 ├── val.csv
@@ -44,12 +50,32 @@ The code expects TinyVox to have the following structure:
 ```
 
 with:
-- `audio/` containing children's utterances (one .wav = one utterance). This folder is not used in my codebase as I train BabAR with surrounding audio context, but should be usable for any pipeline that trains ASR systems without context. 
+- `audio/` containing children's utterances (one `.wav` per utterance). When `--context_duration 0`, this is the only audio directory required (about 34 GB for TinyVox); `original/` can be omitted.
 - `original/` containing the original audio files (i.e., usually hour long audio files containing the recorded activity). These are the original audio files found in PhonBank.
 - `metadata.csv` containing various metadata (one line = one utterance) as detailed in the [TinyVox git repository](https://github.com/MarvinLvn/tinyvox).
 - `{train,val,test}.csv` containing the metadata split across training, validation, and test sets as detailed in the [TinyVox git repository](https://github.com/MarvinLvn/tinyvox).
 
 ## Model training
+
+Dataset paths do not need to be edited in the source code. Either pass the
+dataset directory on the command line:
+
+```shell
+python train.py --dataset_path /path/to/TinyVox <OTHER_OPTIONS>
+```
+
+or configure it once in your shell:
+
+```shell
+export TINYVOX_DATASET_PATH=/path/to/TinyVox
+python train.py <OTHER_OPTIONS>
+```
+
+By default, the inventory is read from
+`$TINYVOX_DATASET_PATH/unique_phonemes.json`. Set
+`TINYVOX_INVENTORY_PATH` or pass `--inventory_path` only if it is stored
+elsewhere. A dataset path must be supplied explicitly; the code does not assume
+any machine-specific directory layout.
 
 To train a model, you can run:
 
@@ -65,8 +91,18 @@ python train.py --network_name <NETWORK_NAME> --context_duration <CONTEXT_DURATI
 
 where:
 - <NETWORK_NAME> is Wav2Vec2, Hubert, WavLM, Wav2Vec2XLSR, W2VLB, or BabyHubert
-- <CONTEXT_DURATION> is the size of the context window in seconds (we found 20s performs best on TinyVox)
+- <CONTEXT_DURATION> is the size of the context window in seconds. Use `0` to train directly from the utterance-level files in `audio/`; positive values require `original/` (we found 20s performs best on TinyVox).
 - <WANDB_PROJECT> is the name of this experiment (for logging in wandb)
+
+For example, an audio-only run should include:
+
+```shell
+python train.py \
+  --dataset_path ../tinyvox/TinyVox \
+  --context_duration 0 \
+  --network_name WavLM \
+  --wandb_project tinyvox-no-context
+```
 
 ## Model evaluation 
 
@@ -80,5 +116,3 @@ where:
 - <CHECKPOINT_PATH> is the path to the .pt files
 - <SPLIT> is val or test
 - <CONTEXT_DURATION> is the size of the context window (s) used during training
-
-

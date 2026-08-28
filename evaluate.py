@@ -8,6 +8,7 @@ python evaluate.py --checkpoint_path weights/my_run/epoch-05-val_per=0.12.ckpt -
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 import sys
@@ -199,8 +200,13 @@ def main():
                         help='Path to PyTorch Lightning checkpoint (.ckpt file)')
 
     # Dataset arguments
-    parser.add_argument('--dataset_path', default='/scratch2/mlavechin/tinyvox/TinyVox',
-                        help='Path to TinyVox dataset')
+    configured_dataset_path = os.environ.get('TINYVOX_DATASET_PATH')
+    parser.add_argument(
+        '--dataset_path',
+        default=configured_dataset_path,
+        required=configured_dataset_path is None,
+        help='Path to TinyVox dataset (or set TINYVOX_DATASET_PATH)',
+    )
     parser.add_argument('--vocab_phoneme_path', default=None,
                         help='Path to vocab-phoneme-tinyvox (auto-detected if not provided)')
     parser.add_argument('--use_vad', action='store_true',
