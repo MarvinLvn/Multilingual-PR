@@ -29,6 +29,8 @@ class BaseTrainer:
 
         self.logger = init_logger("BaseTrainer", "INFO")
 
+        config.data_param.validate_paths()
+
         self.logger.info(f"Create vocabulary language for TinyVox ...")
 
         (

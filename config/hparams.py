@@ -1,8 +1,9 @@
 import os
 from pickle import FALSE
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import path as osp
+from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional
 from simple_parsing.helpers import Serializable, choice, dict_field, list_field
 import multiprocessing
@@ -89,8 +90,14 @@ class DatasetParams:
     """
 
     # TinyVox Dataset Parameters
-    dataset_path: str = "/scratch2/mlavechin/tinyvox/TinyVox"
-    inventory_path: str= "/scratch2/mlavechin/tinyvox/TinyVox/unique_phonemes.json"
+    # Configure paths through command-line arguments or environment variables;
+    # do not commit machine-specific paths to the repository.
+    dataset_path: Optional[str] = field(default_factory=lambda: os.environ.get(
+        "TINYVOX_DATASET_PATH"
+    ))
+    inventory_path: Optional[str] = field(default_factory=lambda: os.environ.get(
+        "TINYVOX_INVENTORY_PATH"
+    ))
     use_vad: bool = False  # Use audio_with_vad folder instead of audio
     debug_dataset: bool = False # If activated, will only load 1000 training samples
     cache_dir: str = osp.join(os.getcwd(), "assets") # Where dataset files will be stored
@@ -102,7 +109,57 @@ class DatasetParams:
 
     # Dataset processing parameters
     num_proc: int = 4
-    context_duration: Optional[int] = 0 # duration of windows in seconds; if 0, will pad with silence; otherwise will pad with context until context_duration is reach
+    # Window duration in seconds. A value of 0 loads utterance-level files
+    # directly from audio/; positive values load windows from original/.
+    context_duration: Optional[int] = 0
+
+    def __post_init__(self):
+        self.resolve_paths()
+
+    def resolve_paths(self):
+        """Normalize configured paths and derive the default inventory path."""
+        if self.dataset_path is not None:
+            self.dataset_path = str(Path(self.dataset_path).expanduser())
+
+        # Unless explicitly configured, keep the inventory next to the TinyVox
+        # metadata. This makes --dataset_path the only path normally required.
+        if self.inventory_path is None and self.dataset_path is not None:
+            self.inventory_path = str(
+                Path(self.dataset_path) / "unique_phonemes.json"
+            )
+        elif self.inventory_path is not None:
+            self.inventory_path = str(Path(self.inventory_path).expanduser())
+
+    def validate_paths(self):
+        # Resolve again in case an argument parser updated a nested dataclass
+        # after its initial construction.
+        self.resolve_paths()
+
+        if self.dataset_path is None:
+            raise ValueError(
+                "TinyVox dataset path is not configured. Pass --dataset_path "
+                "or set TINYVOX_DATASET_PATH."
+            )
+
+        dataset_path = Path(self.dataset_path)
+        if not dataset_path.is_dir():
+            raise FileNotFoundError(
+                f"TinyVox dataset not found: {dataset_path}. "
+                "Pass --dataset_path or set TINYVOX_DATASET_PATH."
+            )
+
+        if self.inventory_path is None:
+            raise ValueError(
+                "Phoneme inventory path is not configured. Pass "
+                "--inventory_path or set TINYVOX_INVENTORY_PATH."
+            )
+
+        inventory_path = Path(self.inventory_path)
+        if not inventory_path.is_file():
+            raise FileNotFoundError(
+                f"Phoneme inventory not found: {inventory_path}. Run "
+                f"'python utils/create_phoneme_inventory.py {dataset_path}'."
+            )
 
 
 @dataclass
